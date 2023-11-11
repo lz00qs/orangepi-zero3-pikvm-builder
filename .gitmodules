@@ -1,0 +1,3 @@
+[submodule "os-builder"]
+	path = os-builder
+	url = https://github.com/lz00qs/orangepi-zero3-archlinux-builder
