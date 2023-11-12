@@ -179,14 +179,14 @@ patch_pikvm() {
     echo -e "#!/bin/sh\necho "ro"" | sudo tee /usr/local/bin/ro
     chmod +x /usr/local/bin/rw
     chmod +x /usr/local/bin/ro
-    
+
     rm /usr/bin/ustreamer* || true
     git clone --depth=1 https://github.com/pikvm/ustreamer
-    pushd ustreamer > /dev/null
+    pushd ustreamer >/dev/null
     make
     make install
     ln -sf /usr/local/bin/ustreamer* /usr/bin/
-    popd > /dev/null
+    popd >/dev/null
 }
 
 install_basic_pkg
