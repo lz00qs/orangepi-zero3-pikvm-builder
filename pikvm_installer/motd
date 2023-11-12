@@ -1,0 +1,26 @@
+         _____ _  _  ____      ____  __
+        |  __ (_)| |/ /\ \    / /  \/  |
+        | |__) | | ' /  \ \  / /| \  / |
+        |  ___/ ||  <    \ \/ / | |\/| |
+        | |   | || . \    \  /  | |  | |
+        |_|   |_||_|\_\    \/   |_|  |_|
+
+    Welcome to PiKVM - The Open Source KVM over IP on Raspberry Pi
+    ____________________________________________________________________________
+
+    The root filesystem of PiKVM is mounted in the read-only mode by default.
+    Use command "rw" to remount it in the RW-mode and "ro" to switch it back.
+    If the filesystem is busy and doesn't switch to the RO-mode, use "reboot"
+    to reboot the device, don't leave it in the RW-mode.
+
+    Useful commands:
+      * Preventing kernel messages in the console:  dmesg -n 1
+      * Changing the Web UI password:  kvmd-htpasswd set admin
+      * Changing the root password:    passwd
+
+    Links:
+      * Official website:  https://pikvm.org
+      * Documentation:     https://docs.pikvm.org
+      * Auth & 2FA:        https://docs.pikvm.org/auth
+      * Networking:        https://wiki.archlinux.org/title/systemd-networkd
+

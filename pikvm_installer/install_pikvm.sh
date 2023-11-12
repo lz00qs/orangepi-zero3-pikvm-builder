@@ -4,6 +4,8 @@ PIKVM_REPO_KEY=912C773ABBD1B584
 PIKVM_REPO_URL=https://files.pikvm.org/repos/arch/
 BOARD=rpi4
 PLATFORM=v2-hdmiusb
+WEBUI_ADMIN_PASSWD=admin
+IPMI_ADMIN_PASSWD=admin
 
 install_basic_pkg() {
     # pacman-key --init
@@ -98,8 +100,97 @@ install_pikvm_repo() {
 }
 
 install_pikvm_pkg() {
+    pacman --noconfirm --ask=4 -Syu
+    # pkg-install --assume-installed tessdata \
+    #     kvmd-platform-$PLATFORM-$BOARD \
+    #     kvmd-webterm \
+    #     kvmd-oled \
+    #     kvmd-fan \
+    #     tesseract \
+    #     tesseract-data-eng \
+    #     wiringpi \
+    #     pastebinit \
+    #     dhclient \
+    #     tmate \
+    #     vi-vim-symlink \
+    #     nano-syntax-highlighting \
+    #     hostapd \
+    #     edid-decode &&
+    #     if [[ $PLATFORM =~ ^v4.*$ ]]; then pkg-install flashrom-pikvm; fi
 
+    pkg-install --assume-installed tessdata \
+        kvmd-platform-$PLATFORM-$BOARD \
+        kvmd-webterm \
+        tesseract \
+        tesseract-data-eng \
+        wiringpi \
+        pastebinit \
+        dhclient \
+        tmate \
+        vi-vim-symlink \
+        nano-syntax-highlighting \
+        hostapd &&
+        if [[ $PLATFORM =~ ^v4.*$ ]]; then pkg-install flashrom-pikvm; fi
+
+    pacman -R --noconfirm firmware-raspberrypi
+
+    # echo "LABEL=PIPST /var/lib/kvmd/pst  ext4  $PART_OPTS,X-kvmd.pst-user=kvmd-pst  0 2" >>/etc/fstab
+
+    systemctl enable kvmd-bootconfig &&
+        systemctl enable kvmd &&
+        systemctl enable kvmd-pst &&
+        systemctl enable kvmd-nginx &&
+        systemctl enable kvmd-webterm &&
+        if [[ $PLATFORM =~ ^.*-hdmi$ ]]; then systemctl enable kvmd-tc358743; fi &&
+        if [[ $PLATFORM =~ ^v0.*$ ]]; then systemctl mask serial-getty@ttyAMA0.service; fi &&
+        if [[ $PLATFORM =~ ^v[234].*$ ]]; then
+            systemctl enable kvmd-otg &&
+                echo "LABEL=PIMSD /var/lib/kvmd/msd  ext4  $PART_OPTS,X-kvmd.otgmsd-user=kvmd  0 2" >>/etc/fstab \
+                ;
+        fi &&
+        if [[ $BOARD =~ ^rpi4|zero2w$ && $PLATFORM =~ ^v[234].*-hdmi$ ]]; then systemctl enable kvmd-janus; fi &&
+        if [[ $BOARD =~ ^rpi3$ && $PLATFORM =~ ^v[1].*-hdmi$ ]]; then systemctl enable kvmd-janus; fi &&
+        if [[ $PLATFORM =~ ^v[34].*$ ]]; then systemctl enable kvmd-watchdog; fi &&
+        if [[ -n "$OLED" || $PLATFORM =~ ^v4.*$ ]]; then systemctl enable kvmd-oled kvmd-oled-reboot kvmd-oled-shutdown; fi &&
+        if [[ -n "$FAN" || $PLATFORM == v4plus-hdmi ]]; then systemctl enable kvmd-fan; fi
+
+    cp nanorc /etc/skel/.nanorc
+    cp -a /etc/skel/.nanorc /root && cp -a /etc/skel/.nanorc /home/kvmd-webterm && chown kvmd-webterm:kvmd-webterm /home/kvmd-webterm/.nanorc
+
+    cp motd /etc/
+    cp issue /etc/
+
+    # userdel -r -f alarm
+
+    echo "$WEBUI_ADMIN_PASSWD" | kvmd-htpasswd set --read-stdin admin
+
+    sed -i "\$d" /etc/kvmd/ipmipasswd &&
+        echo "admin:$IPMI_ADMIN_PASSWD -> admin:$WEBUI_ADMIN_PASSWD" >>/etc/kvmd/ipmipasswd
+
+    rm -f /etc/ssh/ssh_host_* /etc/kvmd/nginx/ssl/* /etc/kvmd/vnc/ssl/*
+
+    echo "FIRST_BOOT=1" >/boot/pikvm.txt
+
+}
+
+patch_pikvm() {
+    sudo echo -e "kvmd:\n    msd:\n        type: disabled\n    atx:\n        type: disabled" | sudo tee /etc/kvmd/override.yaml
+    echo -e "#!/bin/sh\necho "rw"" | sudo tee /usr/local/bin/rw
+    echo -e "#!/bin/sh\necho "ro"" | sudo tee /usr/local/bin/ro
+    chmod +x /usr/local/bin/rw
+    chmod +x /usr/local/bin/ro
+    
+    rm /usr/bin/ustreamer* || true
+    git clone --depth=1 https://github.com/pikvm/ustreamer
+    pushd ustreamer > /dev/null
+    make
+    make install
+    ln -sf /usr/local/bin/ustreamer* /usr/bin/
+    popd > /dev/null
 }
 
 install_basic_pkg
 install_pikvm_repo
+sed -i 's/Architecture = aarch64/Architecture = auto/g' /etc/pacman.conf
+install_pikvm_pkg
+patch_pikvm
