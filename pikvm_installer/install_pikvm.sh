@@ -1,17 +1,11 @@
 #/bin/bash -e
-
-PIKVM_REPO_KEY=912C773ABBD1B584
-PIKVM_REPO_URL=https://files.pikvm.org/repos/arch/
-BOARD=rpi4
-PLATFORM=v2-hdmiusb
-WEBUI_ADMIN_PASSWD=admin
-IPMI_ADMIN_PASSWD=admin
+source config
 
 install_basic_pkg() {
     # pacman-key --init
     # pacman-key --populate archlinuxarm
     # pacman --noconfirm --ask=4 -Syy
-    echo "Server = https://mirrors.ustc.edu.cn/archlinuxarm/\$arch/\$repo" >/etc/pacman.d/mirrorlist &&
+    echo "Server = ${MIRROR_URL}" >/etc/pacman.d/mirrorlist &&
         pacman-key --init &&
         pacman-key --populate archlinuxarm
     pacman --needed --noconfirm --ask=4 -S \

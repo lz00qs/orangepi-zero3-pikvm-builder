@@ -1,5 +1,9 @@
 import os
-from os_builder.scripts.out.py_modules.tools import Logger, run_cmd_with_exit
+from os_builder.scripts.out.py_modules.tools import (
+    Logger,
+    run_cmd_with_exit,
+    split_config,
+)
 
 logger = Logger(name="log")
 
@@ -11,7 +15,13 @@ logger.info("base_path: " + path_base)
 
 def prepare_config():
     logger.info("Preparing config...")
-    run_cmd_with_exit("cp ./config.ini os_builder/config.ini")
+    with open("config.ini", "r") as original_config:
+        original_config = original_config.read()
+        pikvm_config, os_builder_config = split_config(original_config, "PiKVMConfig")
+        with open("os_builder/config.ini", "w") as os_builder_config_file:
+            os_builder_config_file.write(os_builder_config)
+        with open("pikvm_installer/config", "w") as pikvm_config_file:
+            pikvm_config_file.write(pikvm_config.replace("[PiKVMConfig]", ""))
 
 
 def restore_os_builder():
