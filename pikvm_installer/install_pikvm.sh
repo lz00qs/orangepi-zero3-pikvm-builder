@@ -2,12 +2,6 @@
 source config
 
 install_basic_pkg() {
-    # pacman-key --init
-    # pacman-key --populate archlinuxarm
-    # pacman --noconfirm --ask=4 -Syy
-    echo "Server = ${MIRROR_URL}" >/etc/pacman.d/mirrorlist &&
-        pacman-key --init &&
-        pacman-key --populate archlinuxarm
     pacman --needed --noconfirm --ask=4 -S \
         glibc \
         openssl \
@@ -94,6 +88,10 @@ install_pikvm_repo() {
 }
 
 install_pikvm_pkg() {
+    # storage /boot file to avoid modification by pacman
+    boot_backup_temp=$(mktemp -d)
+    cp -r /boot/* "$boot_backup_temp"
+
     pacman --noconfirm --ask=4 -Syu
     # pkg-install --assume-installed tessdata \
     #     kvmd-platform-$PLATFORM-$BOARD \
@@ -125,8 +123,6 @@ install_pikvm_pkg() {
         nano-syntax-highlighting \
         hostapd &&
         if [[ $PLATFORM =~ ^v4.*$ ]]; then pkg-install flashrom-pikvm; fi
-
-    pacman -R --noconfirm firmware-raspberrypi
 
     # echo "LABEL=PIPST /var/lib/kvmd/pst  ext4  $PART_OPTS,X-kvmd.pst-user=kvmd-pst  0 2" >>/etc/fstab
 
@@ -163,8 +159,11 @@ install_pikvm_pkg() {
 
     rm -f /etc/ssh/ssh_host_* /etc/kvmd/nginx/ssl/* /etc/kvmd/vnc/ssl/*
 
-    echo "FIRST_BOOT=1" >/boot/pikvm.txt
+    rm -rf /boot/*
+    cp -r "$boot_backup_temp"/* /boot/
+    rm -rf "$boot_backup_temp"
 
+    echo "FIRST_BOOT=1" >/boot/pikvm.txt
 }
 
 patch_pikvm() {
@@ -177,7 +176,7 @@ patch_pikvm() {
     rm /usr/bin/ustreamer* || true
     git clone --depth=1 https://github.com/pikvm/ustreamer
     pushd ustreamer >/dev/null
-    make
+    make -j$(nproc)
     make install
     ln -sf /usr/local/bin/ustreamer* /usr/bin/
     popd >/dev/null
