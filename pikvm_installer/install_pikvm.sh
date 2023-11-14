@@ -52,11 +52,11 @@ install_basic_pkg() {
     echo "DNSSEC=no" >>/etc/systemd/resolved.conf &&
         systemctl enable systemd-resolved
 
-    cp e2fsck.conf /etc/
+    cp os/e2fsck.conf /etc/
 
-    cp gitconfig /etc/skel/.gitconfig
-    cp gitconfig /root/.gitconfig
-    cp gitconfig /home/alarm/.gitconfig
+    cp os/gitconfig /etc/skel/.gitconfig
+    cp os/gitconfig /root/.gitconfig
+    cp os/gitconfig /home/alarm/.gitconfig
 
     mkdir /tmp/linux-profile &&
         git clone https://github.com/mdevaev/linux-profile.git /tmp/linux-profile --depth=1 &&
@@ -66,8 +66,8 @@ install_basic_pkg() {
         chown -R alarm:alarm /home/alarm/{.bash_profile,.bashrc,.vimrc,.vimpagerrc,.vim,.gitconfig} &&
         rm -rf /tmp/linux-profile
 
-    cp pistat /usr/local/bin/
-    cp pkg-install /usr/local/bin/
+    cp os/pistat /usr/local/bin/
+    cp os/pkg-install /usr/local/bin/
 }
 
 install_pikvm_repo() {
@@ -126,8 +126,9 @@ install_pikvm_pkg() {
 
     # echo "LABEL=PIPST /var/lib/kvmd/pst  ext4  $PART_OPTS,X-kvmd.pst-user=kvmd-pst  0 2" >>/etc/fstab
 
-    systemctl enable kvmd-bootconfig &&
-        systemctl enable kvmd &&
+    # Disable kvmd-bootconfig.service to avoid msd partition umount on booting
+    # systemctl enable kvmd-bootconfig &&
+    systemctl enable kvmd &&
         systemctl enable kvmd-pst &&
         systemctl enable kvmd-nginx &&
         systemctl enable kvmd-webterm &&
@@ -144,11 +145,11 @@ install_pikvm_pkg() {
         if [[ -n "$OLED" || $PLATFORM =~ ^v4.*$ ]]; then systemctl enable kvmd-oled kvmd-oled-reboot kvmd-oled-shutdown; fi &&
         if [[ -n "$FAN" || $PLATFORM == v4plus-hdmi ]]; then systemctl enable kvmd-fan; fi
 
-    cp nanorc /etc/skel/.nanorc
+    cp pikvm/nanorc /etc/skel/.nanorc
     cp -a /etc/skel/.nanorc /root && cp -a /etc/skel/.nanorc /home/kvmd-webterm && chown kvmd-webterm:kvmd-webterm /home/kvmd-webterm/.nanorc
 
-    cp motd /etc/
-    cp issue /etc/
+    cp pikvm/motd /etc/
+    cp pikvm/issue /etc/
 
     # userdel -r -f alarm
 
@@ -167,7 +168,7 @@ install_pikvm_pkg() {
 }
 
 patch_pikvm() {
-    sudo echo -e "kvmd:\n    msd:\n        type: disabled\n    atx:\n        type: disabled" | sudo tee /etc/kvmd/override.yaml
+    sudo echo -e "kvmd:\n    atx:\n        type: disabled" | sudo tee /etc/kvmd/override.yaml
     echo -e "#!/bin/sh\necho "rw"" | sudo tee /usr/local/bin/rw
     echo -e "#!/bin/sh\necho "ro"" | sudo tee /usr/local/bin/ro
     chmod +x /usr/local/bin/rw
