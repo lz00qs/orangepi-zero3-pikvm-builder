@@ -252,6 +252,7 @@ def generate_fstab():
             f"sudo install -DTm 644 {path_fstab_temp} {path_root}/etc/fstab"
         )
         run_cmd_with_exit(f"cat {path_root}/etc/fstab")
+        print("\n")
     except Exception as e:
         logger.error("Generate fstab error. " + e.__str__())
         sys.exit(1)
