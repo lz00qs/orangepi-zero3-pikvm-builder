@@ -42,6 +42,9 @@ def copy_pikvm_installer():
     run_cmd_with_exit(
         "mv os_builder/scripts/in/pikvm_installer/remove_customize_inside.sh os_builder/scripts/in/configure_rootfs/remove_customize_inside.sh"
     )
+    run_cmd_with_exit(
+        "mv os_builder/scripts/in/pikvm_installer/create_img_func.py os_builder/scripts/out/py_modules/create_img_func.py"
+    )
 
 
 __main__ = "__main__"
