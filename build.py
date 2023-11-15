@@ -55,6 +55,7 @@ try:
     os.chdir(path_os_builder)
     run_cmd_with_exit("python3 build.py")
     os.chdir(path_base)
+    run_cmd_with_exit("mv os_builder/releases .")
 except Exception as e:
     logger.error("Prepare config error. " + e.__str__())
 finally:
