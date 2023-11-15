@@ -45,6 +45,9 @@ def copy_pikvm_installer():
     run_cmd_with_exit(
         "mv os_builder/scripts/in/pikvm_installer/create_img_func.py os_builder/scripts/out/py_modules/create_img_func.py"
     )
+    run_cmd_with_exit(
+        "rm -f os_builder/booting/boot.sh && mv os_builder/scripts/in/pikvm_installer/booting/boot.sh os_builder/booting/boot.sh"
+    )
 
 
 __main__ = "__main__"
@@ -55,7 +58,9 @@ try:
     os.chdir(path_os_builder)
     run_cmd_with_exit("python3 build.py")
     os.chdir(path_base)
-    run_cmd_with_exit("mv os_builder/releases .")
+    if not os.path.exists("releases"):
+        os.mkdir("releases")
+    run_cmd_with_exit("cp -r os_builder/releases/* releases")
 except Exception as e:
     logger.error("Prepare config error. " + e.__str__())
 finally:

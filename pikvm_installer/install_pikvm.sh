@@ -124,11 +124,8 @@ install_pikvm_pkg() {
         hostapd &&
         if [[ $PLATFORM =~ ^v4.*$ ]]; then pkg-install flashrom-pikvm; fi
 
-    # echo "LABEL=PIPST /var/lib/kvmd/pst  ext4  $PART_OPTS,X-kvmd.pst-user=kvmd-pst  0 2" >>/etc/fstab
-
-    # Disable kvmd-bootconfig.service to avoid msd partition umount on booting
-    # systemctl enable kvmd-bootconfig &&
-    systemctl enable kvmd &&
+    systemctl enable kvmd-bootconfig &&
+        systemctl enable kvmd &&
         systemctl enable kvmd-pst &&
         systemctl enable kvmd-nginx &&
         systemctl enable kvmd-webterm &&

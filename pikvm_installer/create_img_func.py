@@ -16,9 +16,8 @@ table_type = ""
 boot_part_start = ""
 boot_part_end = ""
 fstab_templete = ""
-rootfs_part_end = ""
-pimsd_part_end = ""
-
+rootfs_part_start = ""
+pimsd_part_start = ""
 
 def subtract_megabytes(str1, str2):
     megabytes1 = int(str1.rstrip("M"))
@@ -61,11 +60,10 @@ def load_config():
 
     pimsd_part_size = config.get("ImgConfig", "pimsd_part_size")
     pipst_part_size = config.get("ImgConfig", "pipst_part_size")
-    global pimsd_part_end
-    pimsd_part_end = subtract_megabytes(img_size, pipst_part_size)
-    global rootfs_part_end
-    rootfs_part_end = subtract_megabytes(pimsd_part_end, pimsd_part_size)
-    
+    global rootfs_part_start
+    rootfs_part_start = add_megabytes(boot_part_end, pipst_part_size)
+    global pimsd_part_start
+    pimsd_part_start = subtract_megabytes(img_size, pimsd_part_size)
 
 
 def create_blank_disk():
@@ -88,17 +86,17 @@ def create_partition():
             f"parted {path_releases_img} mklabel msdos "
             + f"mkpart primary fat32 {boot_part_start}iB {boot_part_end}iB "
             + "set 1 boot on "
-            + f"mkpart primary ext4 {boot_part_end}iB {rootfs_part_end}iB "
-            + f"mkpart primary ext4 {rootfs_part_end}iB {pimsd_part_end}iB "
-            + f"mkpart primary ext4 {pimsd_part_end}iB 100%"
+            + f"mkpart primary ext4 {boot_part_end}iB {rootfs_part_start}iB "
+            + f"mkpart primary ext4 {rootfs_part_start}iB {pimsd_part_start}iB "
+            + f"mkpart primary ext4 {pimsd_part_start}iB 100%"
         )
     elif table_type == "gpt":
         run_cmd_with_exit(
             f"parted {path_releases_img} mklabel  "
             + f"mkpart ArchBoot fat32 {boot_part_start}iB {boot_part_end}iB "
-            + f"mkpart ArchRoot ext4 {boot_part_end}iB {rootfs_part_end}iB "
-            + f"mkpart PIMSD ext4 {rootfs_part_end}iB {pimsd_part_end}iB "
-            + f"mkpart PIPST ext4 {pimsd_part_end}iB 100%"
+            + f"mkpart ArchRoot ext4 {boot_part_end}iB {rootfs_part_start}iB "
+            + f"mkpart PIMSD ext4 {rootfs_part_start}iB {pimsd_part_start}iB "
+            + f"mkpart PIPST ext4 {pimsd_part_start}iB 100%"
         )
     else:
         logger.error("Unknown table type.")
@@ -110,6 +108,7 @@ loop_boot = ""
 loop_root = ""
 loop_pimsd = ""
 loop_pipst = ""
+
 
 def setup_loop():
     logger.info("Setting up loop device...")
@@ -128,12 +127,13 @@ def setup_loop():
         logger.info(f"Using loop device {loop_device}")
         global loop_boot
         loop_boot = f"{loop_device}p1"
-        global loop_root
-        loop_root = f"{loop_device}p2"
-        global loop_pimsd
-        loop_pimsd = f"{loop_device}p3"
         global loop_pipst
-        loop_pipst = f"{loop_device}p4"
+        loop_pipst = f"{loop_device}p2"
+        global loop_pimsd
+        loop_pimsd = f"{loop_device}p4"
+        global loop_root
+        loop_root = f"{loop_device}p3"
+
     except Exception as e:
         logger.error("Set up loop device error. " + e.__str__())
         sys.exit(1)
@@ -165,14 +165,15 @@ def create_fs():
         run_cmd_with_exit(
             f"sudo mkfs.vfat -n 'ALARMBOOT' -F 32 -i {uuid_boot_mkfs} {loop_boot}"
         )
+        logger.info(f"Creating ext4 FS with Label 'PIPST' on {loop_pipst}")
+        run_cmd_with_exit(f"sudo mkfs.ext4 -L 'PIPST' -m 0 {loop_pipst}")
+        logger.info(f"Creating ext4 FS with Label 'PIMSD' on {loop_pimsd}")
+        run_cmd_with_exit(f"sudo mkfs.ext4 -L 'PIMSD' -m 0 {loop_pimsd}")
         logger.info(f"Creating ext4 FS with UUID {uuid_root} on {loop_root}")
         run_cmd_with_exit(
             f"sudo mkfs.ext4 -L 'ALARMROOT' -m 0 -U {uuid_root} {loop_root}"
         )
-        logger.info(f"Creating ext4 FS with Label 'PIMSD' on {loop_pimsd}")
-        run_cmd_with_exit(f"sudo mkfs.ext4 -L 'PIMSD' -m 0 {loop_pimsd}")
-        logger.info(f"Creating ext4 FS with Label 'PIPST' on {loop_pipst}")
-        run_cmd_with_exit(f"sudo mkfs.ext4 -L 'PIPST' -m 0 {loop_pipst}")
+
     except Exception as e:
         logger.error("Create fs error. " + e.__str__())
         sys.exit(1)
