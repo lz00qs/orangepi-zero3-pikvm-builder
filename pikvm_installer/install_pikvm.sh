@@ -168,7 +168,8 @@ install_pikvm_pkg() {
 }
 
 patch_pikvm() {
-    sudo echo -e "kvmd:\n    atx:\n        type: disabled" | sudo tee /etc/kvmd/override.yaml
+    sudo mv pikvm/override.yaml /etc/kvmd/override.yaml
+    cat /etc/kvmd/override.yaml
     echo -e "#!/bin/sh\necho "rw"" | sudo tee /usr/local/bin/rw
     echo -e "#!/bin/sh\necho "ro"" | sudo tee /usr/local/bin/ro
     chmod +x /usr/local/bin/rw
