@@ -2,6 +2,7 @@
 source config
 
 install_basic_pkg() {
+    echo "Installing basic packages..."
     pacman --needed --noconfirm --ask=4 -S \
         glibc \
         openssl \
@@ -71,6 +72,7 @@ install_basic_pkg() {
 }
 
 install_pikvm_repo() {
+    echo "Installing pikvm repo..."
     (
         mkdir -p /etc/gnupg &&
             echo standard-resolver >>/etc/gnupg/dirmngr.conf &&
@@ -88,6 +90,7 @@ install_pikvm_repo() {
 }
 
 install_pikvm_pkg() {
+    echo "Installing pikvm packages..."
     # storage /boot file to avoid modification by pacman
     boot_backup_temp=$(mktemp -d)
     cp -r /boot/* "$boot_backup_temp"
@@ -165,6 +168,7 @@ install_pikvm_pkg() {
 }
 
 patch_pikvm() {
+    echo "Patching pikvm..."
     sudo mv pikvm/override.yaml /etc/kvmd/override.yaml
     cat /etc/kvmd/override.yaml
     echo -e "#!/bin/sh\necho "rw"" | sudo tee /usr/local/bin/rw
@@ -181,8 +185,34 @@ patch_pikvm() {
     popd >/dev/null
 }
 
+disk_ro() {
+    echo "Installing read-only rootfs..."
+    sudo mkdir -p /var/lib/private && sudo chmod 700 /var/lib/private &&
+        sudo mkdir -p /var/lib/dhcpcd && sudo chmod 750 /var/lib/dhcpcd &&
+        sudo mkdir -p /var/lib/dhclient && sudo chmod 755 /var/lib/dhclient
+
+    sudo rm -f /usr/local/bin/rw
+    sudo rm -f /usr/local/bin/ro
+    sudo cp ro/ro /usr/local/bin/
+    sudo chmod +x /usr/local/bin/ro
+    sudo cp ro/rw /usr/local/bin/
+    sudo chmod +x /usr/local/bin/rw
+    sudo cp ro/journald.conf /etc/systemd/
+    sudo cp ro/logrotate.override /etc/systemd/system/logrotate.service.d/override.conf
+
+    sudo systemctl mask systemd-random-seed &&
+        sudo systemctl mask systemd-update-done &&
+        sudo systemctl mask man-db.service &&
+        sudo systemctl mask man-db.timer
+}
+
+echo "Installing pikvm..."
 install_basic_pkg
 install_pikvm_repo
 sed -i 's/Architecture = aarch64/Architecture = auto/g' /etc/pacman.conf
 install_pikvm_pkg
 patch_pikvm
+
+if [[ "$RO" == "yes" ]]; then
+    disk_ro
+fi

@@ -12,12 +12,15 @@ file_name_img = ""
 img_size = ""
 path_releases = ""
 path_releases_img = ""
+path_scripts_in = ""
 table_type = ""
 boot_part_start = ""
 boot_part_end = ""
 fstab_templete = ""
+ro_fstab = ""
 rootfs_part_start = ""
 pimsd_part_start = ""
+
 
 def subtract_megabytes(str1, str2):
     megabytes1 = int(str1.rstrip("M"))
@@ -43,6 +46,8 @@ def load_config():
     release_prefix = os.environ["RELEASE_PREFIX"]
     global img_size
     img_size = config.get("ImgConfig", "img_size")
+    global path_scripts_in
+    path_scripts_in = os.environ["PATH_SCRIPTS_IN"]
     global file_name_img
     file_name_img = f"{release_prefix}.img"
     global path_releases_img
@@ -57,6 +62,8 @@ def load_config():
     boot_part_end = config.get("ImgConfig", "boot_part_end")
     global fstab_templete
     fstab_templete = config.get("FstabConfig", "fstab_templete")
+    global ro_fstab
+    ro_fstab = config.get("FstabConfig", "ro_fstab")
 
     pimsd_part_size = config.get("ImgConfig", "pimsd_part_size")
     pipst_part_size = config.get("ImgConfig", "pipst_part_size")
@@ -239,6 +246,12 @@ def extract_built_rootfs():
 def generate_fstab():
     logger.info("Generating fstab...")
     try:
+        path_pikvm_config = os.path.join(path_scripts_in, "pikvm_installer/config")
+        ro = False
+        with open(path_pikvm_config, "r") as file:
+            config = file.read()
+            if "RO='yes'" in config:
+                ro = True
         path_fstab_temp = (
             subprocess.run(f"mktemp", shell=True, check=True, capture_output=True)
             .stdout.decode("utf-8")
@@ -247,6 +260,10 @@ def generate_fstab():
         fstab_modified = fstab_templete.replace(
             "uuid_boot", uuid_boot_specifier
         ).replace("uuid_root", uuid_root)
+        if ro:
+            fstab_modified = fstab_modified.replace("rw", "ro,errors=remount-ro")
+            fstab_modified = fstab_modified + "\n" + ro_fstab + "\n"
+
         with open(path_fstab_temp, "w") as file:
             file.write(fstab_modified)
         run_cmd_with_exit(
