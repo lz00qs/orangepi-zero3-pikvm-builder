@@ -1,0 +1,5 @@
+bootpart_num=3
+fdtfile=dtbs/linux-aarch64-orangepi-zero3/allwinner/sun50i-h616-orangepi-zero3.dtb
+overlay_path=/dtbs/linux-aarch64-orangepi-zero3/allwinner/overlay
+overlay_prefix=sun50i-h616
+overlays=ph-i2c3

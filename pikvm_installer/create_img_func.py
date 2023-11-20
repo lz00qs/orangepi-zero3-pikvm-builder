@@ -289,6 +289,7 @@ def install_bootloader():
                 run_cmd_with_exit(
                     f"sudo mkimage -A arm64 -O linux -T script -C none -d {os.path.join(path_booting,script)} {os.path.join(path_boot,script_name)}"
                 )
+        run_cmd_with_exit(f"sudo cp {os.path.join(path_booting,'uEnv.txt')} {path_boot}")
         run_cmd_with_exit(f"ls {path_boot}")
         uboot_name = "u-boot-sunxi-with-spl-opizero3-1gb.bin"
         run_cmd_with_exit(

@@ -46,7 +46,7 @@ def copy_pikvm_installer():
         "mv os_builder/scripts/in/pikvm_installer/create_img_func.py os_builder/scripts/out/py_modules/create_img_func.py"
     )
     run_cmd_with_exit(
-        "rm -f os_builder/booting/boot.sh && mv os_builder/scripts/in/pikvm_installer/booting/boot.sh os_builder/booting/boot.sh"
+        "rm -f os_builder/booting/uEnv.txt && mv os_builder/scripts/in/pikvm_installer/booting/uEnv.txt os_builder/booting/uEnv.txt"
     )
 
 
