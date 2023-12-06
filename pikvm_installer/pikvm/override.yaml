@@ -1,7 +1,7 @@
 kvmd:
     atx:
         type: gpio
-        power_led_pin: 227
-        hdd_led_pin: 226
-        power_switch_pin: 72
-        reset_switch_pin: 69
+        power_led_pin: 79
+        hdd_led_pin: 78
+        power_switch_pin: 71
+        reset_switch_pin: 74

@@ -2,6 +2,7 @@
 source config
 
 install_basic_pkg() {
+    echo "Installing basic packages..."
     pacman --needed --noconfirm --ask=4 -S \
         glibc \
         openssl \
@@ -71,6 +72,7 @@ install_basic_pkg() {
 }
 
 install_pikvm_repo() {
+    echo "Installing pikvm repo..."
     (
         mkdir -p /etc/gnupg &&
             echo standard-resolver >>/etc/gnupg/dirmngr.conf &&
@@ -88,6 +90,7 @@ install_pikvm_repo() {
 }
 
 install_pikvm_pkg() {
+    echo "Installing pikvm packages..."
     # storage /boot file to avoid modification by pacman
     boot_backup_temp=$(mktemp -d)
     cp -r /boot/* "$boot_backup_temp"
@@ -124,11 +127,8 @@ install_pikvm_pkg() {
         hostapd &&
         if [[ $PLATFORM =~ ^v4.*$ ]]; then pkg-install flashrom-pikvm; fi
 
-    # echo "LABEL=PIPST /var/lib/kvmd/pst  ext4  $PART_OPTS,X-kvmd.pst-user=kvmd-pst  0 2" >>/etc/fstab
-
-    # Disable kvmd-bootconfig.service to avoid msd partition umount on booting
-    # systemctl enable kvmd-bootconfig &&
-    systemctl enable kvmd &&
+    systemctl enable kvmd-bootconfig &&
+        systemctl enable kvmd &&
         systemctl enable kvmd-pst &&
         systemctl enable kvmd-nginx &&
         systemctl enable kvmd-webterm &&
@@ -168,6 +168,7 @@ install_pikvm_pkg() {
 }
 
 patch_pikvm() {
+    echo "Patching pikvm..."
     sudo mv pikvm/override.yaml /etc/kvmd/override.yaml
     cat /etc/kvmd/override.yaml
     echo -e "#!/bin/sh\necho "rw"" | sudo tee /usr/local/bin/rw
@@ -184,8 +185,47 @@ patch_pikvm() {
     popd >/dev/null
 }
 
+disk_ro() {
+    echo "Installing read-only rootfs..."
+    sudo mkdir -p /var/lib/private && sudo chmod 700 /var/lib/private &&
+        sudo mkdir -p /var/lib/dhcpcd && sudo chmod 750 /var/lib/dhcpcd &&
+        sudo mkdir -p /var/lib/dhclient && sudo chmod 755 /var/lib/dhclient
+
+    sudo rm -f /usr/local/bin/rw
+    sudo rm -f /usr/local/bin/ro
+    sudo cp ro/ro /usr/local/bin/
+    sudo chmod +x /usr/local/bin/ro
+    sudo cp ro/rw /usr/local/bin/
+    sudo chmod +x /usr/local/bin/rw
+    sudo cp ro/journald.conf /etc/systemd/
+    sudo cp ro/logrotate.override /etc/systemd/system/logrotate.service.d/override.conf
+
+    sudo systemctl mask systemd-random-seed &&
+        sudo systemctl mask systemd-update-done &&
+        sudo systemctl mask man-db.service &&
+        sudo systemctl mask man-db.timer
+}
+
+install_pikvm_oled() {
+    # refer to https://github.com/adafruit/Adafruit_Blinka/pull/749
+    pip install adafruit-circuitpython-ssd1306 --break-system-packages
+    rm /usr/lib/python3.11/site-packages/adafruit_blinka/microcontroller/allwinner/h616/pin.py
+    cp pikvm-oled/pin.py /usr/lib/python3.11/site-packages/adafruit_blinka/microcontroller/allwinner/h616/pin.py
+
+    install -Dm755 pikvm-oled/pikvm-oled.py /usr/bin/pikvm-oled
+    cp pikvm-oled/pikvm-oled.service /usr/lib/systemd/system
+
+    systemctl enable pikvm-oled
+}
+
+echo "Installing pikvm..."
 install_basic_pkg
 install_pikvm_repo
 sed -i 's/Architecture = aarch64/Architecture = auto/g' /etc/pacman.conf
 install_pikvm_pkg
 patch_pikvm
+install_pikvm_oled
+
+if [[ "$RO" == "yes" ]]; then
+    disk_ro
+fi

@@ -12,12 +12,14 @@ file_name_img = ""
 img_size = ""
 path_releases = ""
 path_releases_img = ""
+path_scripts_in = ""
 table_type = ""
 boot_part_start = ""
 boot_part_end = ""
 fstab_templete = ""
-rootfs_part_end = ""
-pimsd_part_end = ""
+ro_fstab = ""
+rootfs_part_start = ""
+pimsd_part_start = ""
 
 
 def subtract_megabytes(str1, str2):
@@ -44,6 +46,8 @@ def load_config():
     release_prefix = os.environ["RELEASE_PREFIX"]
     global img_size
     img_size = config.get("ImgConfig", "img_size")
+    global path_scripts_in
+    path_scripts_in = os.environ["PATH_SCRIPTS_IN"]
     global file_name_img
     file_name_img = f"{release_prefix}.img"
     global path_releases_img
@@ -58,14 +62,15 @@ def load_config():
     boot_part_end = config.get("ImgConfig", "boot_part_end")
     global fstab_templete
     fstab_templete = config.get("FstabConfig", "fstab_templete")
+    global ro_fstab
+    ro_fstab = config.get("FstabConfig", "ro_fstab")
 
     pimsd_part_size = config.get("ImgConfig", "pimsd_part_size")
     pipst_part_size = config.get("ImgConfig", "pipst_part_size")
-    global pimsd_part_end
-    pimsd_part_end = subtract_megabytes(img_size, pipst_part_size)
-    global rootfs_part_end
-    rootfs_part_end = subtract_megabytes(pimsd_part_end, pimsd_part_size)
-    
+    global rootfs_part_start
+    rootfs_part_start = add_megabytes(boot_part_end, pipst_part_size)
+    global pimsd_part_start
+    pimsd_part_start = subtract_megabytes(img_size, pimsd_part_size)
 
 
 def create_blank_disk():
@@ -88,17 +93,17 @@ def create_partition():
             f"parted {path_releases_img} mklabel msdos "
             + f"mkpart primary fat32 {boot_part_start}iB {boot_part_end}iB "
             + "set 1 boot on "
-            + f"mkpart primary ext4 {boot_part_end}iB {rootfs_part_end}iB "
-            + f"mkpart primary ext4 {rootfs_part_end}iB {pimsd_part_end}iB "
-            + f"mkpart primary ext4 {pimsd_part_end}iB 100%"
+            + f"mkpart primary ext4 {boot_part_end}iB {rootfs_part_start}iB "
+            + f"mkpart primary ext4 {rootfs_part_start}iB {pimsd_part_start}iB "
+            + f"mkpart primary ext4 {pimsd_part_start}iB 100%"
         )
     elif table_type == "gpt":
         run_cmd_with_exit(
             f"parted {path_releases_img} mklabel  "
             + f"mkpart ArchBoot fat32 {boot_part_start}iB {boot_part_end}iB "
-            + f"mkpart ArchRoot ext4 {boot_part_end}iB {rootfs_part_end}iB "
-            + f"mkpart PIMSD ext4 {rootfs_part_end}iB {pimsd_part_end}iB "
-            + f"mkpart PIPST ext4 {pimsd_part_end}iB 100%"
+            + f"mkpart ArchRoot ext4 {boot_part_end}iB {rootfs_part_start}iB "
+            + f"mkpart PIMSD ext4 {rootfs_part_start}iB {pimsd_part_start}iB "
+            + f"mkpart PIPST ext4 {pimsd_part_start}iB 100%"
         )
     else:
         logger.error("Unknown table type.")
@@ -110,6 +115,7 @@ loop_boot = ""
 loop_root = ""
 loop_pimsd = ""
 loop_pipst = ""
+
 
 def setup_loop():
     logger.info("Setting up loop device...")
@@ -128,12 +134,13 @@ def setup_loop():
         logger.info(f"Using loop device {loop_device}")
         global loop_boot
         loop_boot = f"{loop_device}p1"
-        global loop_root
-        loop_root = f"{loop_device}p2"
-        global loop_pimsd
-        loop_pimsd = f"{loop_device}p3"
         global loop_pipst
-        loop_pipst = f"{loop_device}p4"
+        loop_pipst = f"{loop_device}p2"
+        global loop_pimsd
+        loop_pimsd = f"{loop_device}p4"
+        global loop_root
+        loop_root = f"{loop_device}p3"
+
     except Exception as e:
         logger.error("Set up loop device error. " + e.__str__())
         sys.exit(1)
@@ -165,14 +172,15 @@ def create_fs():
         run_cmd_with_exit(
             f"sudo mkfs.vfat -n 'ALARMBOOT' -F 32 -i {uuid_boot_mkfs} {loop_boot}"
         )
+        logger.info(f"Creating ext4 FS with Label 'PIPST' on {loop_pipst}")
+        run_cmd_with_exit(f"sudo mkfs.ext4 -L 'PIPST' -m 0 {loop_pipst}")
+        logger.info(f"Creating ext4 FS with Label 'PIMSD' on {loop_pimsd}")
+        run_cmd_with_exit(f"sudo mkfs.ext4 -L 'PIMSD' -m 0 {loop_pimsd}")
         logger.info(f"Creating ext4 FS with UUID {uuid_root} on {loop_root}")
         run_cmd_with_exit(
             f"sudo mkfs.ext4 -L 'ALARMROOT' -m 0 -U {uuid_root} {loop_root}"
         )
-        logger.info(f"Creating ext4 FS with Label 'PIMSD' on {loop_pimsd}")
-        run_cmd_with_exit(f"sudo mkfs.ext4 -L 'PIMSD' -m 0 {loop_pimsd}")
-        logger.info(f"Creating ext4 FS with Label 'PIPST' on {loop_pipst}")
-        run_cmd_with_exit(f"sudo mkfs.ext4 -L 'PIPST' -m 0 {loop_pipst}")
+
     except Exception as e:
         logger.error("Create fs error. " + e.__str__())
         sys.exit(1)
@@ -238,6 +246,12 @@ def extract_built_rootfs():
 def generate_fstab():
     logger.info("Generating fstab...")
     try:
+        path_pikvm_config = os.path.join(path_scripts_in, "pikvm_installer/config")
+        ro = False
+        with open(path_pikvm_config, "r") as file:
+            config = file.read()
+            if "RO='yes'" in config:
+                ro = True
         path_fstab_temp = (
             subprocess.run(f"mktemp", shell=True, check=True, capture_output=True)
             .stdout.decode("utf-8")
@@ -246,6 +260,10 @@ def generate_fstab():
         fstab_modified = fstab_templete.replace(
             "uuid_boot", uuid_boot_specifier
         ).replace("uuid_root", uuid_root)
+        if ro:
+            fstab_modified = fstab_modified.replace("rw", "ro,errors=remount-ro")
+            fstab_modified = fstab_modified + "\n" + ro_fstab + "\n"
+
         with open(path_fstab_temp, "w") as file:
             file.write(fstab_modified)
         run_cmd_with_exit(
@@ -271,6 +289,7 @@ def install_bootloader():
                 run_cmd_with_exit(
                     f"sudo mkimage -A arm64 -O linux -T script -C none -d {os.path.join(path_booting,script)} {os.path.join(path_boot,script_name)}"
                 )
+        run_cmd_with_exit(f"sudo cp {os.path.join(path_booting,'uEnv.txt')} {path_boot}")
         run_cmd_with_exit(f"ls {path_boot}")
         uboot_name = "u-boot-sunxi-with-spl-opizero3-1gb.bin"
         run_cmd_with_exit(
