@@ -206,12 +206,25 @@ disk_ro() {
         sudo systemctl mask man-db.timer
 }
 
+install_pikvm_oled() {
+    # refer to https://github.com/adafruit/Adafruit_Blinka/pull/749
+    pip install adafruit-circuitpython-ssd1306 --break-system-packages
+    rm /usr/lib/python3.11/site-packages/adafruit_blinka/microcontroller/allwinner/h616/pin.py
+    cp pikvm-oled/pin.py /usr/lib/python3.11/site-packages/adafruit_blinka/microcontroller/allwinner/h616/pin.py
+
+    install -Dm755 pikvm-oled/pikvm-oled.py /usr/bin/pikvm-oled
+    cp pikvm-oled/pikvm-oled.service /usr/lib/systemd/system
+
+    systemctl enable pikvm-oled
+}
+
 echo "Installing pikvm..."
 install_basic_pkg
 install_pikvm_repo
 sed -i 's/Architecture = aarch64/Architecture = auto/g' /etc/pacman.conf
 install_pikvm_pkg
 patch_pikvm
+install_pikvm_oled
 
 if [[ "$RO" == "yes" ]]; then
     disk_ro
