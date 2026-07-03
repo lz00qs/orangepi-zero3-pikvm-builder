@@ -174,6 +174,9 @@ patch_pikvm() {
     echo "Patching pikvm..."
     sudo mv pikvm/override.yaml /etc/kvmd/override.yaml
     cat /etc/kvmd/override.yaml
+    sudo sed -i \
+        's/KERNEL=="video\[0-9\]\*", SUBSYSTEM=="video4linux"/KERNEL=="video[0-9]*", SUBSYSTEM=="video4linux", SUBSYSTEMS=="usb"/' \
+        /usr/lib/udev/rules.d/99-kvmd.rules
     echo -e "#!/bin/sh\necho "rw"" | sudo tee /usr/local/bin/rw
     echo -e "#!/bin/sh\necho "ro"" | sudo tee /usr/local/bin/ro
     chmod +x /usr/local/bin/rw
