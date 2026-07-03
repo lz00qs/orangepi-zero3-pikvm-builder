@@ -5,8 +5,7 @@ install_basic_pkg() {
     echo "Installing basic packages..."
     pacman --needed --noconfirm --ask=4 -S \
         glibc \
-        openssl \
-        openssl-1.1
+        openssl
     pacman --needed --noconfirm --ask=4 -S pacman
     pacman-db-upgrade
     pacman-key --init
@@ -59,13 +58,17 @@ install_basic_pkg() {
     cp os/gitconfig /root/.gitconfig
     cp os/gitconfig /home/alarm/.gitconfig
 
-    mkdir /tmp/linux-profile &&
-        git clone https://github.com/mdevaev/linux-profile.git /tmp/linux-profile --depth=1 &&
-        cp -a /tmp/linux-profile/{.bash_profile,.bashrc,.vimrc,.vimpagerrc,.vim} /etc/skel &&
-        cp -a /tmp/linux-profile/{.bash_profile,.bashrc,.vimrc,.vimpagerrc,.vim} /root &&
-        cp -a /tmp/linux-profile/{.bash_profile,.bashrc,.vimrc,.vimpagerrc,.vim} /home/alarm &&
-        chown -R alarm:alarm /home/alarm/{.bash_profile,.bashrc,.vimrc,.vimpagerrc,.vim,.gitconfig} &&
-        rm -rf /tmp/linux-profile
+    rm -rf /tmp/linux-profile
+    git clone https://github.com/mdevaev/linux-profile.git /tmp/linux-profile --depth=1
+    for profile_path in .bash_profile .bashrc .vimrc .vimpagerrc .vim; do
+        if [[ -e "/tmp/linux-profile/${profile_path}" ]]; then
+            cp -a "/tmp/linux-profile/${profile_path}" /etc/skel
+            cp -a "/tmp/linux-profile/${profile_path}" /root
+            cp -a "/tmp/linux-profile/${profile_path}" /home/alarm
+        fi
+    done
+    chown -R alarm:alarm /home/alarm/.bash_profile /home/alarm/.bashrc /home/alarm/.vimrc /home/alarm/.vim /home/alarm/.gitconfig 2>/dev/null || true
+    rm -rf /tmp/linux-profile
 
     cp os/pistat /usr/local/bin/
     cp os/pkg-install /usr/local/bin/
@@ -198,6 +201,7 @@ disk_ro() {
     sudo cp ro/rw /usr/local/bin/
     sudo chmod +x /usr/local/bin/rw
     sudo cp ro/journald.conf /etc/systemd/
+    sudo mkdir -p /etc/systemd/system/logrotate.service.d
     sudo cp ro/logrotate.override /etc/systemd/system/logrotate.service.d/override.conf
 
     sudo systemctl mask systemd-random-seed &&
@@ -209,8 +213,17 @@ disk_ro() {
 install_pikvm_oled() {
     # refer to https://github.com/adafruit/Adafruit_Blinka/pull/749
     pip install adafruit-circuitpython-ssd1306 --break-system-packages
-    rm /usr/lib/python3.11/site-packages/adafruit_blinka/microcontroller/allwinner/h616/pin.py
-    cp pikvm-oled/pin.py /usr/lib/python3.11/site-packages/adafruit_blinka/microcontroller/allwinner/h616/pin.py
+    blinka_h616_dir=$(python - <<'PY'
+import pathlib
+import sysconfig
+
+path = pathlib.Path(sysconfig.get_paths()["purelib"]) / "adafruit_blinka/microcontroller/allwinner/h616"
+print(path)
+PY
+)
+    mkdir -p "${blinka_h616_dir}"
+    rm -f "${blinka_h616_dir}/pin.py"
+    cp pikvm-oled/pin.py "${blinka_h616_dir}/pin.py"
 
     install -Dm755 pikvm-oled/pikvm-oled.py /usr/bin/pikvm-oled
     cp pikvm-oled/pikvm-oled.service /usr/lib/systemd/system

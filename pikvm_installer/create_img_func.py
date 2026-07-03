@@ -236,7 +236,7 @@ def extract_built_rootfs():
             path_releases, f"{release_prefix}-rootfs.tar.gz"
         )
         run_cmd_with_exit(
-            f"sudo bsdtar -C {path_root} --acls --xattrs -xpf {path_releases_rootfs}"
+            f"sudo bsdtar -C {path_root} --no-fflags -xf {path_releases_rootfs}"
         )
     except Exception as e:
         logger.error("Extract built rootfs error. " + e.__str__())

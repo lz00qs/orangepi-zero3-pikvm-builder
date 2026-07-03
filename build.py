@@ -1,3 +1,4 @@
+import configparser
 import os
 from os_builder.scripts.out.py_modules.tools import (
     Logger,
@@ -31,6 +32,59 @@ def restore_os_builder():
     os.chdir(path_base)
 
 
+def refresh_build_root_mirror():
+    config = configparser.ConfigParser()
+    with open("os_builder/config.ini", "r") as config_file:
+        pacman_config, _ = split_config(config_file.read(), "PacManConfig")
+    config.read_string(pacman_config)
+    mirror_url = config.get("PacManConfig", "mirror_url", fallback="").strip()
+    mirrorlist_path = os.path.join(
+        path_os_builder, "build/build_root/etc/pacman.d/mirrorlist"
+    )
+    if not mirror_url or not os.path.exists(mirrorlist_path):
+        return
+    sed_cmd = (
+        "sudo sed -i -E "
+        f"'s#^Server = .*/\\$arch/\\$repo#Server = {mirror_url}#g' "
+        f"'{mirrorlist_path}'"
+    )
+    run_cmd_with_exit(sed_cmd)
+    logger.info("Refreshed build root pacman mirror: " + mirror_url)
+
+
+def patch_os_builder_scripts():
+    prepare_entrypoint = os.path.join(
+        path_os_builder, "scripts/in/prepare_build_root_entrypoint.sh"
+    )
+    if os.path.exists(prepare_entrypoint):
+        with open(prepare_entrypoint, "r") as file:
+            content = file.read()
+        patched = content.replace(
+            "pacman -Rcns linux-aarch64 vi --noconfirm",
+            "pacman -Rcns linux-aarch64 --noconfirm",
+        )
+        if patched != content:
+            with open(prepare_entrypoint, "w") as file:
+                file.write(patched)
+            logger.info("Patched build root cleanup package list")
+
+    pacstrap_rootfs = os.path.join(
+        path_os_builder, "scripts/in/pacstrap_rootfs.sh"
+    )
+    if os.path.exists(pacstrap_rootfs):
+        with open(pacstrap_rootfs, "r") as file:
+            content = file.read()
+        patched = content.replace(
+            '    sudo mkdir -p "${dir_pacstrap_rootfs}"',
+            '    sudo rm -rf "${dir_pacstrap_rootfs}"\n'
+            '    sudo mkdir -p "${dir_pacstrap_rootfs}"',
+        )
+        if patched != content:
+            with open(pacstrap_rootfs, "w") as file:
+                file.write(patched)
+            logger.info("Patched pacstrap rootfs cleanup")
+
+
 def copy_pikvm_installer():
     run_cmd_with_exit("cp -r pikvm_installer os_builder/scripts/in")
     run_cmd_with_exit(
@@ -54,6 +108,8 @@ __main__ = "__main__"
 try:
     run_cmd_with_exit("rm -rf os_builder/releases")
     prepare_config()
+    patch_os_builder_scripts()
+    refresh_build_root_mirror()
     copy_pikvm_installer()
     os.chdir(path_os_builder)
     run_cmd_with_exit("python3 build.py")
