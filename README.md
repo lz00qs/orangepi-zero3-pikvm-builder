@@ -25,7 +25,7 @@ sudo apt install \
 
 Secondly, clone this repo with `--recursive` option:
 ```bash
-git clone --recursive https://github.com/lz00qs/orangepi-zero3-archlinux-builder.git
+git clone --recursive https://github.com/lz00qs/orangepi-zero3-pikvm-builder.git
 ```
 
 
